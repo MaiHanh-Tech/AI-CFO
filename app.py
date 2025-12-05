@@ -10,7 +10,7 @@ from pypdf import PdfReader
 from docx import Document
 import io
 
-# --- 1. CẤU HÌNH ---
+# --- 1. CẤU HÌNH TRANG ---
 st.set_page_config(page_title="AI Financial Controller Pro", layout="wide", page_icon="📈")
 
 # --- TỪ ĐIỂN ĐA NGÔN NGỮ ---
