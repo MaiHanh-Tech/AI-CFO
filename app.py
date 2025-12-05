@@ -10,57 +10,60 @@ from pypdf import PdfReader
 from docx import Document
 import io
 
-# --- 1. CẤU HÌNH TRANG ---
-st.set_page_config(page_title="AI Financial Controller Pro", layout="wide", page_icon="📈")
+# --- 1. CẤU HÌNH ---
+st.set_page_config(page_title="AI Financial Controller Ultimate", layout="wide", page_icon="💰")
 
 # --- TỪ ĐIỂN ĐA NGÔN NGỮ ---
 TRANS = {
     "vi": {
-        "title": "💰 Hệ thống Phân tích Tài chính & Quản trị (CFO AI)",
+        "title": "💰 Hệ thống Giám đốc Tài chính AI (CFO Ultimate)",
         "role_admin": "CFO (Giám đốc Tài chính)",
         "role_chief": "Kế toán trưởng",
-        "role_staff": "Kế toán viên",
-        "tab1": "📊 Chỉ Số Tài Chính (KPIs)",
-        "tab2": "📉 Phân Tích Hoạt Động",
-        "tab3": "🔮 Dự Báo Chiến Lược",
-        "tab4": "💬 Trợ Lý Số Liệu",
-        "group_liquid": "1. Khả năng Thanh toán",
-        "group_profit": "2. Khả năng Sinh lời",
-        "group_active": "3. Hiệu quả Hoạt động",
-        "btn_cn": "🇨🇳 Xuất Báo Cáo Sâu (Tiếng Trung)",
-        "warn": "⚠️ Cảnh báo: {metric} đang ở mức rủi ro ({val})",
+        "role_staff": "Nhân viên Kế toán",
+        "tab1": "📊 Bộ Chỉ Số KPIs",
+        "tab2": "📉 Phân Tích Chi Phí",
+        "tab3": "🕵️ Soát Xét Rủi Ro (ML)",
+        "tab4": "🔮 Chiến Lược & Dự Báo",
+        "tab5": "📚 Thư Viện Luật & Chat",
+        "kpi_select": "Chọn Nhóm Chỉ Số muốn xem:",
+        "grp_liquid": "Khả năng Thanh toán",
+        "grp_profit": "Khả năng Sinh lời",
+        "grp_activity": "Hiệu quả Hoạt động",
+        "btn_cn": "🇨🇳 Báo Cáo Sếp (Tiếng Trung)",
         "logout": "Đăng xuất"
     },
     "en": {
-        "title": "💰 AI Financial Controller Pro",
+        "title": "💰 AI Financial Controller Ultimate",
         "role_admin": "CFO",
         "role_chief": "Chief Accountant",
         "role_staff": "Staff",
         "tab1": "📊 Financial KPIs",
-        "tab2": "📉 Activity Analysis",
-        "tab3": "🔮 Forecast Strategy",
-        "tab4": "💬 Data Assistant",
-        "group_liquid": "1. Liquidity Ratios",
-        "group_profit": "2. Profitability Ratios",
-        "group_active": "3. Activity Ratios",
-        "btn_cn": "🇨🇳 Generate Deep Report (Chinese)",
-        "warn": "⚠️ Warning: {metric} is risky ({val})",
+        "tab2": "📉 Cost Analysis",
+        "tab3": "🕵️ Risk Audit (ML)",
+        "tab4": "🔮 Strategy Forecast",
+        "tab5": "📚 Law & Chat",
+        "kpi_select": "Select KPI Group:",
+        "grp_liquid": "Liquidity",
+        "grp_profit": "Profitability",
+        "grp_activity": "Activity/Turnover",
+        "btn_cn": "🇨🇳 Generate Chinese Report",
         "logout": "Logout"
     },
     "zh": {
-        "title": "💰 AI 财务分析与管理系统",
+        "title": "💰 AI 财务总监控制系统",
         "role_admin": "财务总监 (CFO)",
         "role_chief": "财务经理",
         "role_staff": "会计",
         "tab1": "📊 财务指标 (KPIs)",
-        "tab2": "📉 经营分析",
-        "tab3": "🔮 战略预测",
-        "tab4": "💬 数据助手",
-        "group_liquid": "1. 偿债能力",
-        "group_profit": "2. 盈利能力",
-        "group_active": "3. 营运能力",
-        "btn_cn": "🇨🇳 生成深度报告",
-        "warn": "⚠️ 警告：{metric} 处于风险水平 ({val})",
+        "tab2": "📉 成本分析",
+        "tab3": "🕵️ 风险审计 (ML)",
+        "tab4": "🔮 战略预测",
+        "tab5": "📚 法律与问答",
+        "kpi_select": "选择指标组:",
+        "grp_liquid": "偿债能力",
+        "grp_profit": "盈利能力",
+        "grp_activity": "营运能力",
+        "btn_cn": "🇨🇳 生成中文汇报",
         "logout": "登出"
     }
 }
@@ -77,45 +80,29 @@ class AuthManager:
     def verify(self, u, p): return u in self.users and self.users[u] == p
     def get_role(self, u): return self.roles.get(u, "staff")
 
-# --- 3. LOGIC TÀI CHÍNH CHUYÊN SÂU (CORE) ---
-def tao_data_chuyen_sau():
-    # Giả lập dữ liệu đầy đủ cho Bảng CĐKT và KQKD
+# --- 3. LOGIC TÀI CHÍNH (DATA GENERATOR SIÊU CẤP) ---
+def tao_data_full_kpi():
+    # Tạo dữ liệu đủ để tính mọi chỉ số Chị yêu cầu
     dates = pd.date_range(start="2024-01-01", periods=12, freq="ME")
     df = pd.DataFrame({"Tháng": dates})
     
-    # KQKD
-    df["Doanh Thu"] = np.random.randint(2000, 3000, 12) * 1000000
-    df["Giá Vốn"] = df["Doanh Thu"] * 0.6
-    df["Lợi Nhuận Sau Thuế"] = df["Doanh Thu"] * 0.15
+    # P&L (Kết quả kinh doanh)
+    df["Doanh Thu"] = np.random.randint(5000, 8000, 12) * 1000000
+    df["Giá Vốn (Trực tiếp)"] = df["Doanh Thu"] * 0.6 # 60%
+    df["Chi Phí VH (Gián tiếp)"] = np.random.randint(500, 800, 12) * 1000000
+    df["Lợi Nhuận ST"] = df["Doanh Thu"] - df["Giá Vốn (Trực tiếp)"] - df["Chi Phí VH (Gián tiếp)"]
     
-    # CĐKT (Bình quân)
-    df["Tài Sản Ngắn Hạn"] = np.random.randint(1000, 1500, 12) * 1000000
-    df["Nợ Ngắn Hạn"] = np.random.randint(500, 800, 12) * 1000000
-    df["Tổng Tài Sản"] = np.random.randint(5000, 6000, 12) * 1000000
-    df["Vốn Chủ Sở Hữu"] = df["Tổng Tài Sản"] * 0.6
+    # Balance Sheet (Cân đối kế toán - Bình quân)
+    df["TS Ngắn Hạn"] = np.random.randint(2000, 3000, 12) * 1000000
+    df["Nợ Ngắn Hạn"] = np.random.randint(1000, 1500, 12) * 1000000
+    df["Hàng Tồn Kho"] = np.random.randint(800, 1200, 12) * 1000000
+    df["Phải Thu KH"] = np.random.randint(1000, 1500, 12) * 1000000
+    df["Tổng Tài Sản"] = df["TS Ngắn Hạn"] + 5000000000 # Cộng tài sản dài hạn cố định
+    df["Vốn Chủ Sở Hữu"] = df["Tổng Tài Sản"] * 0.5 # Giả định 50% vốn
     
-    df["Hàng Tồn Kho"] = np.random.randint(300, 500, 12) * 1000000
-    df["Phải Thu Khách Hàng"] = np.random.randint(400, 600, 12) * 1000000
-    
-    return df
-
-def tinh_chi_so_tai_chinh(df):
-    """Hàm tính toán bộ chỉ số KPI"""
-    # 1. Thanh toán
-    df["Current Ratio"] = df["Tài Sản Ngắn Hạn"] / df["Nợ Ngắn Hạn"] # Thanh toán hiện hành
-    
-    # 2. Hoạt động (Vòng quay - tính theo năm giả định x12 cho tháng)
-    # Vòng quay tồn kho = Giá vốn / Tồn kho bq
-    df["Inv Turnover"] = df["Giá Vốn"] / df["Hàng Tồn Kho"] 
-    # Vòng quay phải thu = Doanh thu / Phải thu bq
-    df["AR Turnover"] = df["Doanh Thu"] / df["Phải Thu Khách Hàng"]
-    # Vòng quay tài sản = Doanh thu / Tổng tài sản
-    df["Asset Turnover"] = df["Doanh Thu"] / df["Tổng Tài Sản"]
-
-    # 3. Sinh lời
-    df["ROS"] = (df["Lợi Nhuận Sau Thuế"] / df["Doanh Thu"]) * 100
-    df["ROA"] = (df["Lợi Nhuận Sau Thuế"] / df["Tổng Tài Sản"]) * 100
-    df["ROE"] = (df["Lợi Nhuận Sau Thuế"] / df["Vốn Chủ Sở Hữu"]) * 100
+    # Gài bẫy cho ML bắt (Tháng 6 và 10 chi phí cao bất thường)
+    df.loc[5, "Chi Phí VH (Gián tiếp)"] = 2500000000
+    df.loc[9, "Chi Phí VH (Gián tiếp)"] = 2200000000
     
     return df
 
@@ -128,7 +115,24 @@ try:
     model = genai.GenerativeModel('gemini-1.5-flash')
 except: pass
 
-# --- 4. GIAO DIỆN ---
+# --- CÁC HÀM PHỤ TRỢ ---
+def doc_tai_lieu(uploaded_file):
+    try:
+        ext = uploaded_file.name.split('.')[-1].lower()
+        if ext == 'pdf': return "\n".join([p.extract_text() for p in PdfReader(uploaded_file).pages])
+        elif ext == 'docx': return "\n".join([p.text for p in Document(uploaded_file).paragraphs])
+        elif ext in ['txt', 'md']: return str(uploaded_file.read(), "utf-8")
+    except: return ""
+    return ""
+
+def phat_hien_gian_lan_ml(df):
+    # Dùng Isolation Forest (Cái cũ chị thích)
+    model_iso = IsolationForest(contamination=0.1, random_state=42)
+    # Soi trên Chi phí Vận hành
+    df['Anomaly_Score'] = model_iso.fit_predict(df[['Chi Phí VH (Gián tiếp)']])
+    return df[df['Anomaly_Score'] == -1]
+
+# --- 4. GIAO DIỆN CHÍNH ---
 def show_dashboard():
     with st.sidebar:
         lang_map = {"Tiếng Việt": "vi", "English": "en", "中文": "zh"}
@@ -142,10 +146,10 @@ def show_dashboard():
         
         st.header("🗂️ Data Source")
         if st.button("Tạo dữ liệu mẫu (Full KPIs)"):
-            st.session_state.df_fin = tao_data_chuyen_sau()
+            st.session_state.df_fin = tao_data_full_kpi()
             st.rerun()
         
-        up = st.file_uploader("Upload Excel (Đủ cột CĐKT & KQKD)", type=['xlsx'])
+        up = st.file_uploader("Upload Excel", type=['xlsx'])
         if up: st.session_state.df_fin = pd.read_excel(up)
 
         if st.button(T("logout")):
@@ -154,112 +158,137 @@ def show_dashboard():
     st.title(T("title"))
 
     if 'df_fin' not in st.session_state:
-        st.info("👈 Vui lòng tạo dữ liệu mẫu để xem các chỉ số chuyên sâu.")
+        # Màn hình chờ đẹp
+        st.info("👈 Mời Giám đốc tạo dữ liệu mẫu hoặc Upload file.")
+        c1, c2, c3 = st.columns(3)
+        with c1: st.markdown("### 📊 KPIs & HĐ Kinh Tế\nTính vòng quay, ROE, ROA.")
+        with c2: st.markdown("### 🕵️ ML Risk Audit\nPhát hiện gian lận bằng AI.")
+        with c3: st.markdown("### 🔮 Chiến Lược\nDự báo dòng tiền tương lai.")
         return
 
-    # Tính toán chỉ số trước khi hiển thị
-    df = tinh_chi_so_tai_chinh(st.session_state.df_fin)
-    latest = df.iloc[-1] # Lấy tháng gần nhất
+    df = st.session_state.df_fin
+    last_month = df.iloc[-1]
+    is_vip = role in ["admin", "chief"]
     
-    is_vip = role in ["admin", "chief"] 
-    
-    t1, t2, t3, t4 = st.tabs([T("tab1"), T("tab2"), T("tab3"), T("tab4")])
+    t1, t2, t3, t4, t5 = st.tabs([T("tab1"), T("tab2"), T("tab3"), T("tab4"), T("tab5")])
 
-    # === TAB 1: BỘ CHỈ SỐ TÀI CHÍNH (KPIs) ===
+    # === TAB 1: BỘ CHỈ SỐ TÀI CHÍNH (CHỌN ĐỂ XEM) ===
     with t1:
-        st.subheader(f"Báo cáo Tháng {latest['Tháng'].strftime('%m/%Y')}")
+        st.subheader("Phân tích Hoạt động Kinh tế & Tài chính")
         
-        # Nhóm 1: Thanh toán
-        st.markdown(f"#### 💧 {T('group_liquid')}")
-        k1, k2, k3 = st.columns(3)
-        k1.metric("Current Ratio", f"{latest['Current Ratio']:.2f}", help="Tài sản NH / Nợ NH (Tốt: 2-3)")
-        # Giả lập Quick Ratio (Tài sản nhanh / Nợ)
-        quick_r = (latest['Tài Sản Ngắn Hạn'] - latest['Hàng Tồn Kho']) / latest['Nợ Ngắn Hạn']
-        k2.metric("Quick Ratio", f"{quick_r:.2f}", help="Thanh toán nhanh")
+        # Multiselect để Chị chọn chỉ số muốn xem
+        options = [T("grp_liquid"), T("grp_profit"), T("grp_activity")]
+        selection = st.multiselect(T("kpi_select"), options, default=options)
         
-        # Nhóm 2: Sinh lời
-        st.markdown(f"#### 💰 {T('group_profit')}")
-        p1, p2, p3 = st.columns(3)
-        p1.metric("ROS (Net Margin)", f"{latest['ROS']:.1f}%")
-        p2.metric("ROA (Trên Tài sản)", f"{latest['ROA']:.1f}%")
-        p3.metric("ROE (Trên Vốn chủ)", f"{latest['ROE']:.1f}%", help="Lợi nhuận / Vốn chủ sở hữu")
+        if T("grp_liquid") in selection:
+            st.markdown(f"#### 💧 {T('grp_liquid')} (Thanh khoản)")
+            k1, k2 = st.columns(2)
+            curr_r = last_month["TS Ngắn Hạn"] / last_month["Nợ Ngắn Hạn"]
+            quick_r = (last_month["TS Ngắn Hạn"] - last_month["Hàng Tồn Kho"]) / last_month["Nợ Ngắn Hạn"]
+            k1.metric("Thanh toán hiện hành", f"{curr_r:.2f}", help="Lý tưởng: 2-3")
+            k2.metric("Thanh toán nhanh", f"{quick_r:.2f}", help="Loại bỏ hàng tồn kho")
+            st.divider()
 
-        # NÚT BÁO CÁO TIẾNG TRUNG (VIP)
+        if T("grp_profit") in selection:
+            st.markdown(f"#### 💰 {T('grp_profit')} (Sinh lời)")
+            p1, p2, p3 = st.columns(3)
+            ros = (last_month["Lợi Nhuận ST"] / last_month["Doanh Thu"]) * 100
+            roa = (last_month["Lợi Nhuận ST"] / last_month["Tổng Tài Sản"]) * 100
+            roe = (last_month["Lợi Nhuận ST"] / last_month["Vốn Chủ Sở Hữu"]) * 100
+            p1.metric("ROS (Biên lãi ròng)", f"{ros:.1f}%")
+            p2.metric("ROA (Trên tài sản)", f"{roa:.1f}%")
+            p3.metric("ROE (Trên vốn chủ)", f"{roe:.1f}%")
+            st.divider()
+
+        if T("grp_activity") in selection:
+            st.markdown(f"#### 🏭 {T('grp_activity')} (Hiệu quả)")
+            a1, a2, a3 = st.columns(3)
+            # Tính Vòng quay (giả định số liệu tháng là đại diện)
+            inv_turn = last_month["Giá Vốn (Trực tiếp)"] / last_month["Hàng Tồn Kho"]
+            ar_turn = last_month["Doanh Thu"] / last_month["Phải Thu KH"]
+            asset_turn = last_month["Doanh Thu"] / last_month["Tổng Tài Sản"]
+            
+            a1.metric("Vòng quay Tồn kho", f"{inv_turn:.2f} vòng", "Tốc độ bán hàng")
+            a2.metric("Vòng quay Phải thu", f"{ar_turn:.2f} vòng", "Tốc độ thu tiền")
+            a3.metric("Vòng quay Tài sản", f"{asset_turn:.2f} vòng")
+
         if is_vip:
             st.markdown("---")
             if st.button(T("btn_cn"), type="primary"):
-                with st.spinner("AI đang phân tích các chỉ số..."):
-                    p = f"""
-                    Role: Chief Accountant. 
-                    Data Month: {latest['Tháng']}.
-                    Liquidity: Current Ratio {latest['Current Ratio']:.2f}.
-                    Profitability: ROE {latest['ROE']:.1f}%, ROS {latest['ROS']:.1f}%.
-                    Activity: Inventory Turnover {latest['Inv Turnover']:.2f}.
-                    
-                    Task: Write a deep financial analysis in Business Chinese. 
-                    Focus on: Efficiency and Risk.
-                    """
+                with st.spinner("AI writing..."):
+                    p = f"Role: CFO. Data Month: {last_month['Tháng']}. ROE: {roe}%. Inv Turnover: {inv_turn}. Current Ratio: {curr_r}. Write a professional report in Business Chinese."
                     res = model.generate_content(p)
                     st.info(res.text)
 
-    # === TAB 2: PHÂN TÍCH HOẠT ĐỘNG (ACTIVITY) ===
+    # === TAB 2: PHÂN TÍCH CHI PHÍ (QUẢN TRỊ) ===
     with t2:
-        if is_vip:
-            st.markdown(f"#### 🏭 {T('group_active')}")
-            
-            c1, c2 = st.columns(2)
-            with c1:
-                # Biểu đồ Vòng quay tồn kho
-                fig = px.line(df, x="Tháng", y="Inv Turnover", markers=True, title="Vòng quay Hàng Tồn Kho (Lần)")
-                st.plotly_chart(fig, use_container_width=True)
-                st.caption("Cao là tốt: Hàng bán nhanh. Thấp: Ứ đọng vốn.")
-                
-            with c2:
-                # Biểu đồ Vòng quay phải thu
-                fig2 = px.line(df, x="Tháng", y="AR Turnover", markers=True, title="Vòng quay Khoản Phải Thu (Lần)")
-                st.plotly_chart(fig2, use_container_width=True)
-                st.caption("Cao là tốt: Thu hồi nợ nhanh.")
-            
-            # AI Nhận xét hoạt động
-            if st.button("🤖 AI Nhận xét Hiệu quả Hoạt động"):
-                data_str = df[['Tháng', 'Inv Turnover', 'AR Turnover']].tail(3).to_string()
-                res = model.generate_content(f"Phân tích xu hướng hiệu quả hoạt động dựa trên data này: {data_str}. Ngôn ngữ: {st.session_state.lang_code}")
-                st.markdown(res.text)
-        else:
-            st.warning("⛔ Access Denied")
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            st.subheader("Cơ cấu Chi phí (Trực tiếp vs Gián tiếp)")
+            # Stacked Bar Chart
+            fig = px.bar(df, x="Tháng", y=["Giá Vốn (Trực tiếp)", "Chi Phí VH (Gián tiếp)"], title="Biến động Chi phí theo Tháng")
+            st.plotly_chart(fig, use_container_width=True)
+        with c2:
+            st.subheader("Tỷ trọng (Tháng cuối)")
+            labels = ["Giá Vốn", "Chi Phí VH", "Lợi Nhuận"]
+            values = [last_month["Giá Vốn (Trực tiếp)"], last_month["Chi Phí VH (Gián tiếp)"], last_month["Lợi Nhuận ST"]]
+            fig2 = px.pie(values=values, names=labels, hole=0.4)
+            st.plotly_chart(fig2, use_container_width=True)
 
-    # === TAB 3: DỰ BÁO ===
+    # === TAB 3: SOI RỦI RO (DÙNG ML CŨ CỦA CHỊ) ===
     with t3:
-        if st.session_state.user_role == "admin":
-            st.header("Dự báo Lợi nhuận (Linear Regression)")
-            df['idx'] = range(len(df))
-            reg = LinearRegression().fit(df[['idx']], df['Lợi Nhuận Sau Thuế'])
+        if is_vip:
+            st.header("Hệ thống Phát hiện Gian lận (Anomaly Detection)")
+            st.caption("Sử dụng thuật toán Isolation Forest để tìm các khoản chi bất thường.")
             
-            next_months = pd.date_range(start=df["Tháng"].iloc[-1], periods=4, freq="ME")[1:]
-            pred = reg.predict(np.array([[len(df)], [len(df)+1], [len(df)+2]]))
+            if st.button("🔍 QUÉT RỦI RO (ML SCAN)"):
+                bad_data = phat_hien_gian_lan_ml(df.copy())
+                if not bad_data.empty:
+                    st.error(f"⚠️ CẢNH BÁO: Phát hiện {len(bad_data)} tháng có chi phí bất thường!")
+                    st.dataframe(bad_data.style.highlight_max(axis=0, color='pink'))
+                    
+                    # AI Giải thích
+                    with st.spinner("AI đang điều tra nguyên nhân..."):
+                        res = model.generate_content(f"Phân tích dữ liệu bất thường này: {bad_data.to_string()}. Đưa ra 3 nguyên nhân (Gian lận? Mùa vụ? Sai sót?). Tiếng Việt.")
+                        st.markdown(res.text)
+                else:
+                    st.success("✅ Hệ thống ML không tìm thấy bất thường.")
+        else: st.warning("⛔ Restricted Area")
+
+    # === TAB 4: DỰ BÁO (DÙNG LINEAR REGRESSION CŨ CỦA CHỊ) ===
+    with t4:
+        if st.session_state.user_role == "admin":
+            st.header("Dự báo Chiến lược (Strategic Forecast)")
+            
+            # Chạy hồi quy
+            df['idx'] = range(len(df))
+            reg = LinearRegression().fit(df[['idx']], df['Lợi Nhuận ST'])
+            future_X = np.array([[len(df)], [len(df)+1], [len(df)+2]])
+            pred = reg.predict(future_X)
             
             c1, c2 = st.columns([1, 2])
             with c1:
-                st.write("Dự kiến 3 tháng tới:")
-                for d, v in zip(next_months, pred):
-                    st.metric(d.strftime("%m/%Y"), f"{v:,.0f}")
+                st.metric("Dự báo Tháng tới", f"{pred[0]:,.0f}")
+                st.metric("Dự báo 2 tháng tới", f"{pred[1]:,.0f}")
+                st.metric("Dự báo 3 tháng tới", f"{pred[2]:,.0f}")
             with c2:
-                fig = px.scatter(df, x="Tháng", y="Lợi Nhuận Sau Thuế", trendline="ols", title="Xu hướng Lợi nhuận")
+                fig = px.scatter(df, x="Tháng", y="Lợi Nhuận ST", trendline="ols", title="Xu hướng Lợi nhuận")
                 st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("⛔ Chỉ dành cho CFO.")
+        else: st.warning("⛔ Chỉ dành cho CFO.")
 
-    # === TAB 4: CHAT ===
-    with t4:
-        st.subheader("Hỏi đáp số liệu")
-        q = st.chat_input("VD: ROE tháng này có tốt không?")
-        if q:
-            st.chat_message("user").write(q)
-            with st.chat_message("assistant"):
-                # Gửi kèm dữ liệu tháng cuối để AI trả lời chính xác
-                context = f"Dữ liệu tháng mới nhất: {latest.to_json()}"
-                res = model.generate_content(f"Context: {context}. User Q: {q}. Role: Expert Finance. Lang: {st.session_state.lang_code}")
-                st.markdown(res.text)
+    # === TAB 5: THƯ VIỆN LUẬT & CHAT ===
+    with t5:
+        st.header("Trợ lý Pháp chế & Chat Dữ liệu")
+        up_law = st.file_uploader("Upload Văn bản Luật/Báo cáo", type=["pdf", "docx"])
+        if up_law:
+            txt = doc_tai_lieu(up_law)
+            st.success(f"Đã đọc xong {len(txt)} ký tự.")
+            q = st.chat_input("Hỏi gì đó về văn bản này...")
+            if q:
+                st.chat_message("user").write(q)
+                with st.chat_message("assistant"):
+                    res = model.generate_content(f"Context: {txt[:30000]}. Q: {q}. Role: Legal Expert.")
+                    st.write(res.text)
 
 # --- 5. MAIN ---
 def main():
@@ -280,7 +309,6 @@ def main():
                     st.session_state.user_role = auth.get_role(user)
                     st.rerun()
                 else: st.error(T("login_fail"))
-            st.caption("Demo: admin_cfo | chief_acc | staff_01")
     else:
         show_dashboard()
 
