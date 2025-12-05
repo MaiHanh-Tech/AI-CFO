@@ -9,76 +9,71 @@ from pypdf import PdfReader
 from docx import Document
 import io
 import time
+import re
 
 # --- 1. CẤU HÌNH TRANG ---
-st.set_page_config(page_title="AI Financial Controller", layout="wide", page_icon="💰")
+st.set_page_config(page_title="AI Financial Controller Pro", layout="wide", page_icon="⚖️")
 
-# --- TỪ ĐIỂN NGÔN NGỮ (GIỮ NGUYÊN) ---
+# --- TỪ ĐIỂN ĐA NGÔN NGỮ (CẬP NHẬT MỚI) ---
 TRANS = {
     "vi": {
-        "title": "💰 AI Financial Controller",
+        "title": "💰 AI Financial Controller (Hệ thống Kiểm soát Tài chính)",
         "login_title": "🔐 Cổng Đăng Nhập Nội Bộ",
-        "lbl_user": "Tài khoản",
-        "lbl_pass": "Mật khẩu",
-        "btn_login": "Đăng Nhập",
-        "err_login": "Sai tài khoản hoặc mật khẩu!",
         "welcome": "Xin chào",
         "role_admin": "Giám đốc Tài chính (CFO)",
+        "role_chief": "Kế toán trưởng (Chief Acc)", # MỚI
         "role_staff": "Nhân viên Kế toán",
-        "sidebar_lang": "Ngôn ngữ / Language",
-        "sidebar_source": "Nguồn Dữ Liệu",
-        "opt_demo": "🎲 Dữ liệu Demo",
-        "opt_upload": "📂 Upload Excel",
-        "btn_sample": "Tạo dữ liệu mẫu",
         "tab1": "📊 Dashboard",
-        "tab2": "🕵️ Soi Rủi Ro (Admin Only)",
-        "tab3": "🔮 Dự Báo (Admin Only)",
-        "tab4": "💬 Chat Tài Chính",
-        "restricted": "⛔ KHU VỰC HẠN CHẾ: Chỉ dành cho CFO.",
+        "tab2": "🕵️ Soi Rủi Ro (Chief/CFO)",
+        "tab3": "🔮 Dự Báo (CFO Only)",
+        "tab4": "💬 Chat Dữ Liệu",
+        "tab5": "📚 Thư Viện Luật & Thuế", # MỚI
+        "legal_warn": "🚨 CẢNH BÁO PHÁP LÝ",
+        "legal_status": "Trạng thái văn bản:",
+        "legal_expired": "ĐÃ HẾT HIỆU LỰC",
+        "legal_valid": "Đang có hiệu lực",
+        "btn_check_law": "Kiểm tra hiệu lực & Hỏi AI",
+        "restricted": "⛔ KHU VỰC HẠN CHẾ: Bạn không có quyền truy cập.",
         "logout": "Đăng Xuất"
     },
     "en": {
         "title": "💰 AI Financial Controller",
         "login_title": "🔐 Internal Login Portal",
-        "lbl_user": "Username",
-        "lbl_pass": "Password",
-        "btn_login": "Login",
-        "err_login": "Invalid credentials!",
         "welcome": "Welcome",
         "role_admin": "CFO",
+        "role_chief": "Chief Accountant",
         "role_staff": "Accountant",
-        "sidebar_lang": "Language",
-        "sidebar_source": "Data Source",
-        "opt_demo": "🎲 Demo Data",
-        "opt_upload": "📂 Upload Excel",
-        "btn_sample": "Generate Sample",
         "tab1": "📊 Dashboard",
-        "tab2": "🕵️ Risk Audit (Admin)",
-        "tab3": "🔮 Forecast (Admin)",
-        "tab4": "💬 Chat Finance",
-        "restricted": "⛔ RESTRICTED AREA: CFO Access Only.",
+        "tab2": "🕵️ Risk Audit (Chief/CFO)",
+        "tab3": "🔮 Forecast (CFO Only)",
+        "tab4": "💬 Chat Data",
+        "tab5": "📚 Legal & Tax Library",
+        "legal_warn": "🚨 LEGAL WARNING",
+        "legal_status": "Document Status:",
+        "legal_expired": "EXPIRED",
+        "legal_valid": "Valid",
+        "btn_check_law": "Check Validity & Ask AI",
+        "restricted": "⛔ RESTRICTED AREA.",
         "logout": "Logout"
     },
     "zh": {
         "title": "💰 AI 财务控制系统",
-        "login_title": "🔐 内部登录门户",
-        "lbl_user": "用户名",
-        "lbl_pass": "密码",
-        "btn_login": "登录",
-        "err_login": "用户名或密码错误！",
+        "login_title": "🔐 内部登录",
         "welcome": "你好",
         "role_admin": "财务总监 (CFO)",
-        "role_staff": "会计专员",
-        "sidebar_lang": "语言",
-        "sidebar_source": "数据源",
-        "opt_demo": "🎲 模拟数据",
-        "opt_upload": "📂 上传 Excel",
-        "btn_sample": "生成样本",
-        "tab1": "📊 财务概览",
-        "tab2": "🕵️ 风险审计 (仅限管理员)",
-        "tab3": "🔮 预测 (仅限管理员)",
-        "tab4": "💬 财务问答",
-        "restricted": "⛔ 限制区域：仅限财务总监访问。",
+        "role_chief": "财务经理 (Chief Acc)",
+        "role_staff": "会计",
+        "tab1": "📊 概览",
+        "tab2": "🕵️ 风险审计 (主管)",
+        "tab3": "🔮 预测 (CFO)",
+        "tab4": "💬 数据问答",
+        "tab5": "📚 法律税务库",
+        "legal_warn": "🚨 法律警告",
+        "legal_status": "文件状态:",
+        "legal_expired": "已失效",
+        "legal_valid": "有效",
+        "btn_check_law": "检查有效性 & 提问",
+        "restricted": "⛔ 限制区域",
         "logout": "登出"
     }
 }
@@ -87,10 +82,9 @@ def T(key):
     lang = st.session_state.get('lang_code', 'vi')
     return TRANS[lang].get(key, key)
 
-# --- 2. HỆ THỐNG ĐĂNG NHẬP (AUTH MANAGER) ---
+# --- 2. AUTH MANAGER ---
 class AuthManager:
     def __init__(self):
-        # Lấy danh sách user từ secrets
         self.users = st.secrets.get("users", {})
         self.roles = st.secrets.get("roles", {})
 
@@ -100,17 +94,16 @@ class AuthManager:
         return False
 
     def get_role(self, username):
-        # Mặc định là staff nếu không có trong danh sách roles
         return self.roles.get(username, "staff")
 
-# --- 3. CÁC HÀM XỬ LÝ (CORE) ---
+# --- 3. CORE FUNCTIONS ---
 try:
     if 'system' in st.secrets: api_key = st.secrets['system']['gemini_api_key']
     elif 'api_keys' in st.secrets: api_key = st.secrets['api_keys']['gemini_api_key']
     else: st.stop()
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-1.5-flash')
-except: pass # Bỏ qua lỗi nếu chưa login
+except: pass
 
 def doc_tai_lieu(uploaded_file):
     try:
@@ -121,12 +114,19 @@ def doc_tai_lieu(uploaded_file):
     except: return ""
     return ""
 
+# [NÂNG CẤP] ML với Data Cleaning
 def phat_hien_bat_thuong(df):
+    # 1. Clean Data: Xóa dòng trống, ép kiểu số
+    df_clean = df.copy()
+    col_target = df.columns[2] # Giả định cột 3 là Chi phí
+    df_clean[col_target] = pd.to_numeric(df_clean[col_target], errors='coerce')
+    df_clean = df_clean.dropna(subset=[col_target])
+    
+    # 2. Run Isolation Forest
     model_iso = IsolationForest(contamination=0.05, random_state=42)
-    # Tìm cột nào có chữ "Chi" hoặc "Expense" hoặc cột số thứ 3
-    col_target = df.columns[2] 
-    df['Anomaly'] = model_iso.fit_predict(df[[col_target]])
-    return df[df['Anomaly'] == -1]
+    df_clean['Anomaly'] = model_iso.fit_predict(df_clean[[col_target]])
+    
+    return df_clean[df_clean['Anomaly'] == -1]
 
 def du_bao_tuong_lai(df):
     df['X'] = range(len(df))
@@ -134,162 +134,187 @@ def du_bao_tuong_lai(df):
     future = np.array([[len(df)], [len(df)+1], [len(df)+2]])
     return reg.predict(future), reg.coef_[0]
 
-def tao_data_mau():
-    dates = pd.date_range(start="2023-01-01", periods=24, freq="ME")
-    df = pd.DataFrame({
-        "Tháng": dates,
-        "Doanh Thu": np.random.randint(800, 1500, size=24) * 1000,
-        "Chi Phí": np.random.randint(500, 1000, size=24) * 1000,
+# [MỚI] TẠO DATABASE LUẬT GIẢ LẬP (Để demo tính năng cảnh báo)
+def tao_db_luat_mau():
+    return pd.DataFrame({
+        "Ten_Van_Ban": ["Luật Kế toán 2003", "Thông tư 200/2014/TT-BTC", "Nghị định 51/2010/NĐ-CP", "Nghị định 123/2020/NĐ-CP"],
+        "Trang_Thai": ["Hết hiệu lực", "Hiệu lực", "Hết hiệu lực", "Hiệu lực"],
+        "Thay_The_Boi": ["Luật Kế toán 2015", "-", "Nghị định 123/2020/NĐ-CP", "-"]
     })
-    df["Lợi Nhuận"] = df["Doanh Thu"] - df["Chi Phí"]
-    df.loc[10, "Chi Phí"] = 2000000 # Gài bẫy
-    return df
 
-# --- 4. GIAO DIỆN CHÍNH (SAU KHI LOGIN) ---
+def kiem_tra_hieu_luc_van_ban(text_ai_tra_loi, df_luat):
+    """Quét câu trả lời của AI xem có nhắc đến văn bản hết hiệu lực không"""
+    canh_bao = []
+    for index, row in df_luat.iterrows():
+        # Nếu văn bản hết hiệu lực và tên văn bản xuất hiện trong câu trả lời AI
+        if row['Trang_Thai'] == "Hết hiệu lực" and row['Ten_Van_Ban'] in text_ai_tra_loi:
+            msg = f"⚠️ {row['Ten_Van_Ban']} đã HẾT HIỆU LỰC! Hãy dùng: {row['Thay_The_Boi']}."
+            canh_bao.append(msg)
+    return canh_bao
+
+# --- 4. GIAO DIỆN CHÍNH ---
 def show_app():
-    # Sidebar cấu hình
+    # Setup Session
+    if 'df_luat' not in st.session_state: st.session_state.df_luat = tao_db_luat_mau()
+
     with st.sidebar:
-        # Chọn Ngôn ngữ
+        # Lang & User Info
         lang_map = {"Tiếng Việt": "vi", "English": "en", "中文": "zh"}
-        sel_lang = st.selectbox("🌐 Language", list(lang_map.keys()))
+        sel_lang = st.selectbox("🌐 " + T("sidebar_lang"), list(lang_map.keys()))
         st.session_state.lang_code = lang_map[sel_lang]
         
         st.divider()
-        
-        # Thông tin User
-        role_key = "role_admin" if st.session_state.user_role == "admin" else "role_staff"
-        st.success(f"👤 {T('welcome')}, {st.session_state.username}")
-        st.info(f"🔰 {T(role_key)}")
+        role_key = f"role_{st.session_state.user_role}" # role_admin, role_chief, role_staff
+        st.success(f"👤 {st.session_state.username}")
+        st.info(f"🔰 {T(role_key)}") # Hiện chức danh
         
         if st.button(T("logout")):
             st.session_state.is_logged_in = False
             st.rerun()
             
         st.divider()
-        
-        # Chọn Nguồn Dữ liệu
+        # Data Source (Giản lược để tập trung tính năng)
         st.header(f"🗂️ {T('sidebar_source')}")
-        source = st.radio("", [T("opt_demo"), T("opt_upload")])
-        
-        df = None
-        if source == T("opt_demo"):
-            if st.button(T("btn_sample")): st.session_state.df_fin = tao_data_mau()
-        else:
-            up_file = st.file_uploader("Excel", type=['xlsx'])
-            if up_file: st.session_state.df_fin = pd.read_excel(up_file)
-
-        if 'df_fin' in st.session_state:
-            df = st.session_state.df_fin
-            st.success(T("success_load").format(n=len(df)))
+        up_file = st.file_uploader("Upload Excel Báo Cáo", type=['xlsx'])
+        if up_file: 
+            st.session_state.df_fin = pd.read_excel(up_file)
+            st.success("Data Loaded!")
+        elif st.button(T("btn_sample")):
+            # Tạo data mẫu nhanh
+            dates = pd.date_range(start="2024-01-01", periods=12, freq="ME")
+            st.session_state.df_fin = pd.DataFrame({
+                "Month": dates, "Rev": np.random.randint(100,200,12)*10, "Exp": np.random.randint(50,150,12)*10
+            })
+            st.session_state.df_fin["Profit"] = st.session_state.df_fin["Rev"] - st.session_state.df_fin["Exp"]
+            st.session_state.df_fin.iloc[5, 2] = 200000 # Gài lỗi
 
     st.title(T("title"))
 
-    if df is not None:
-        # PHÂN QUYỀN HIỂN THỊ TAB
-        # Nếu là Admin: Thấy hết 4 tab. Nếu là Staff: Chỉ thấy Tab 1 và 4
-        is_admin = st.session_state.user_role == "admin"
-        
-        if is_admin:
-            tabs = st.tabs([T("tab1"), T("tab2"), T("tab3"), T("tab4")])
-            t1, t2, t3, t4 = tabs[0], tabs[1], tabs[2], tabs[3]
-        else:
-            tabs = st.tabs([T("tab1"), T("tab4"), "🔒 Admin Zone", "🔒 Admin Zone"])
-            t1, t4 = tabs[0], tabs[1]
-            t2, t3 = tabs[2], tabs[3] # Tab bị khóa
+    # PHÂN QUYỀN TABS
+    role = st.session_state.user_role
+    
+    # Logic quyền:
+    # Admin (CFO): Full quyền
+    # Chief (Kế toán trưởng): Tab 1, 2, 4, 5 (Không xem Dự báo chiến lược Tab 3)
+    # Staff: Tab 1, 4 (Chỉ xem và chat)
+    
+    is_admin = role == "admin"
+    is_chief = role == "chief" or is_admin
+    
+    t1, t2, t3, t4, t5 = st.tabs([T("tab1"), T("tab2"), T("tab3"), T("tab4"), T("tab5")])
 
-        # --- NỘI DUNG TABS ---
-        
-        # TAB 1: DASHBOARD (Ai cũng xem được)
-        with t1:
-            rev, exp = df.iloc[:, 1].sum(), df.iloc[:, 2].sum()
-            net = rev - exp
+    # TAB 1: DASHBOARD (Public)
+    with t1:
+        if 'df_fin' in st.session_state:
+            df = st.session_state.df_fin
             c1, c2, c3 = st.columns(3)
-            c1.metric("Revenue", f"{rev:,.0f}")
-            c2.metric("Expense", f"{exp:,.0f}")
-            c3.metric("Profit", f"{net:,.0f}")
+            c1.metric(T("metric_rev"), f"{df.iloc[:,1].sum():,.0f}")
+            c2.metric(T("metric_exp"), f"{df.iloc[:,2].sum():,.0f}")
+            c3.metric(T("metric_net"), f"{df.iloc[:,3].sum():,.0f}")
+            st.plotly_chart(px.bar(df, x=df.columns[0], y=[df.columns[1], df.columns[2]], barmode="group"), use_container_width=True)
+        else: st.info("👈 Upload Excel data")
+
+    # TAB 2: ML RISK (Chief + Admin)
+    with t2:
+        if is_chief:
+            st.header(T("risk_header"))
+            if 'df_fin' in st.session_state and st.button(T("risk_btn")):
+                bad = phat_hien_bat_thuong(st.session_state.df_fin)
+                if not bad.empty:
+                    st.error(T("risk_warn").format(n=len(bad)))
+                    st.dataframe(bad.style.highlight_max(axis=0, color='pink'))
+                else: st.success(T("risk_ok"))
+        else: st.warning(T("restricted"))
+
+    # TAB 3: FORECAST (Admin Only)
+    with t3:
+        if is_admin:
+            st.header("🔮 Forecasting Strategy")
+            if 'df_fin' in st.session_state:
+                pred, trend = du_bao_tuong_lai(st.session_state.df_fin)
+                st.plotly_chart(px.scatter(st.session_state.df_fin, x=st.session_state.df_fin.columns[0], y=st.session_state.df_fin.columns[3], trendline="ols"), use_container_width=True)
+        else: st.warning(T("restricted"))
+
+    # TAB 4: CHAT DATA (Public)
+    with t4:
+        st.header("💬 Chat")
+        q = st.chat_input(T("chat_input"))
+        if q:
+            st.chat_message("user").write(q)
+            with st.spinner("AI thinking..."):
+                res = model.generate_content(f"Answer as accountant: {q}")
+                st.chat_message("assistant").write(res.text)
+
+    # TAB 5: THƯ VIỆN LUẬT (Chief + Admin) - TÍNH NĂNG MỚI
+    with t5:
+        if is_chief:
+            st.header("📚 Legal & Tax Knowledge Base")
             
-            # Chỉ Admin mới có nút "Báo cáo tiếng Trung" (Ví dụ phân quyền sâu hơn)
-            if is_admin:
-                if st.button("🇨🇳 Generate Report (Admin Only)", type="primary"):
-                    with st.spinner("AI thinking..."):
-                        res = model.generate_content(f"Role: CFO. Data: {rev}, {exp}, {net}. Write report in Business Chinese.")
-                        st.info(res.text)
+            # Phần 1: Quản lý danh sách hiệu lực
+            with st.expander("📋 Danh sách Hiệu lực Văn bản (Editable)", expanded=True):
+                # Cho phép edit trực tiếp trên bảng (Data Editor)
+                edited_df = st.data_editor(st.session_state.df_luat, num_rows="dynamic")
+                st.session_state.df_luat = edited_df # Lưu lại thay đổi
             
-            fig = px.bar(df, x=df.columns[0], y=[df.columns[1], df.columns[2]], barmode="group")
-            st.plotly_chart(fig, use_container_width=True)
+            # Phần 2: Hỏi đáp Luật & Cảnh báo
+            st.divider()
+            st.subheader("🤖 Trợ lý Pháp chế (Có cảnh báo hiệu lực)")
+            
+            # Upload văn bản luật mới
+            law_file = st.file_uploader("Upload Văn bản Luật (PDF/Docx) để hỏi", type=["pdf", "docx"])
+            law_context = ""
+            if law_file: 
+                law_context = doc_tai_lieu(law_file)
+                st.caption(f"Đã đọc: {law_file.name}")
 
-        # TAB 2: ML RISK (Chỉ Admin)
-        with t2:
-            if is_admin:
-                st.header(T("risk_header"))
-                if st.button(T("risk_btn")):
-                    bad = phat_hien_bat_thuong(df.copy())
-                    if not bad.empty:
-                        st.error(T("risk_warn").format(n=len(bad)))
-                        st.dataframe(bad.style.highlight_max(axis=0, color='pink'))
-                        res = model.generate_content(f"Analyze risks: {bad.to_string()}. Lang: {st.session_state.lang_code}")
-                        st.markdown(res.text)
-                    else: st.success(T("risk_ok"))
-            else:
-                st.warning(T("restricted"))
-                st.image("https://cdn-icons-png.flaticon.com/512/3064/3064197.png", width=100)
+            q_law = st.text_input("Câu hỏi về Luật/Thuế:", placeholder="Ví dụ: Nghị định 51 còn dùng được không?")
+            
+            if st.button(T("btn_check_law")):
+                with st.spinner("Đang tra cứu và kiểm tra hiệu lực..."):
+                    # 1. AI Trả lời
+                    prompt = f"""
+                    Bạn là Chuyên gia Tư vấn Thuế và Luật Kế toán.
+                    Ngữ cảnh văn bản (nếu có): {law_context[:10000]}
+                    Câu hỏi: "{q_law}"
+                    Trả lời chi tiết, trích dẫn văn bản pháp luật nếu biết.
+                    """
+                    res = model.generate_content(prompt)
+                    
+                    # 2. Logic kiểm tra hiệu lực (Cảnh báo đỏ)
+                    alerts = kiem_tra_hieu_luc_van_ban(res.text, st.session_state.df_luat)
+                    
+                    # 3. Hiển thị
+                    if alerts:
+                        for alert in alerts:
+                            st.error(alert) # Hiện cảnh báo đỏ chót
+                    else:
+                        st.success("✅ Các văn bản được nhắc đến đều đang có hiệu lực (hoặc không nằm trong danh sách theo dõi).")
+                        
+                    st.markdown("### 💡 Câu trả lời của AI:")
+                    st.markdown(res.text)
+        else:
+            st.warning(T("restricted"))
 
-        # TAB 3: FORECAST (Chỉ Admin)
-        with t3:
-            if is_admin:
-                st.header(T("forecast_header"))
-                pred, trend = du_bao_tuong_lai(df)
-                st.write(f"Trend: {'🚀 UP' if trend>0 else '📉 DOWN'}")
-                fig2 = px.scatter(df, x=df.columns[0], y=df.columns[3], trendline="ols")
-                st.plotly_chart(fig2, use_container_width=True)
-            else:
-                st.warning(T("restricted"))
-
-        # TAB 4: CHAT (Ai cũng dùng được)
-        with t4:
-            st.header(T("chat_header"))
-            up_doc = st.file_uploader(T("chat_upload"), type=["pdf", "docx", "txt"])
-            if up_doc:
-                txt = doc_tai_lieu(up_doc)
-                st.success(f"Loaded {len(txt)} chars.")
-                if q := st.chat_input(T("chat_input")):
-                    st.chat_message("user").write(q)
-                    with st.chat_message("assistant"):
-                        res = model.generate_content(f"Context: {txt[:30000]}. Q: {q}. Lang: {st.session_state.lang_code}. Role: CFO.")
-                        st.markdown(res.text)
-    else:
-        st.info("👈 Please select Data Source.")
-
-# --- 5. MÀN HÌNH LOGIN ---
+# --- 5. MAIN LOGIN ---
 def main():
     auth = AuthManager()
-    
-    # Khởi tạo session
     if 'is_logged_in' not in st.session_state: st.session_state.is_logged_in = False
     if 'lang_code' not in st.session_state: st.session_state.lang_code = 'vi'
 
     if not st.session_state.is_logged_in:
-        # Giao diện Login đẹp
         c1, c2, c3 = st.columns([1, 2, 1])
         with c2:
             st.title(T("login_title"))
-            st.markdown("---")
             user = st.text_input(T("lbl_user"))
             password = st.text_input(T("lbl_pass"), type="password")
-            
-            if st.button(T("btn_login"), use_container_width=True, type="primary"):
+            if st.button(T("btn_login"), type="primary", use_container_width=True):
                 if auth.verify_login(user, password):
                     st.session_state.is_logged_in = True
                     st.session_state.username = user
                     st.session_state.user_role = auth.get_role(user)
-                    st.toast(f"Welcome {user}!", icon="🎉")
-                    time.sleep(0.5)
                     st.rerun()
-                else:
-                    st.error(T("err_login"))
-            
-            st.caption("Demo Accounts:")
-            st.code("CFO: admin_cfo / mai_hanh_vip\nStaff: staff_01 / nv123")
+                else: st.error(T("err_login"))
+            st.caption("Demo: admin_cfo (CFO) | chief_acc (KTT) | staff_01 (NV)")
     else:
         show_app()
 
