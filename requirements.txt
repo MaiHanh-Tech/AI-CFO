@@ -1,10 +1,9 @@
-
 streamlit
 google-generativeai
 pandas
 numpy
 plotly
 openpyxl
-scikit-learn  <-- (MỚI: Để chạy thuật toán phát hiện gian lận)
-pypdf         <-- (KẾ THỪA: Để đọc PDF báo cáo tài chính)
-python-docx  <-- (Mới thêm để đọc Word)
+scikit-learn
+pypdf
+python-docx
