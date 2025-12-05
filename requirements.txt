@@ -4,3 +4,5 @@ pandas
 numpy
 plotly
 openpyxl
+scikit-learn  <-- (MỚI: Để chạy thuật toán phát hiện gian lận)
+pypdf         <-- (KẾ THỪA: Để đọc PDF báo cáo tài chính)
