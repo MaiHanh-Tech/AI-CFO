@@ -302,37 +302,81 @@ def show_dashboard():
                     st.plotly_chart(fig, use_container_width=True)
         else: st.warning("⛔ Chỉ dành cho CFO.")
 
-    # === TAB 5: PHÁP CHẾ (WEB + FILE) ===
+    # === TAB 5: PHÁP CHẾ & NGHIÊN CỨU (ĐÃ NÂNG CẤP ĐỌC NHIỀU LINK) ===
     with t5:
-        st.header("⚖️ Trung Tâm Pháp Chế")
+        st.header("⚖️ Trung Tâm Pháp Chế & Nghiên Cứu Đa Nguồn")
         
-        # 1. Nạp
-        with st.expander("📥 Nạp Kiến thức (File/Web)", expanded=True):
-            up_laws = st.file_uploader("Upload PDF/Docx", accept_multiple_files=True)
-            url_law = st.text_input("Hoặc dán Link Web:")
+        # 1. KHU VỰC NẠP DỮ LIỆU
+        with st.expander("📥 Nạp Kiến thức (Upload File & Paste Links)", expanded=True):
+            c_file, c_web = st.columns(2)
             
-            if st.button("Nạp Dữ liệu"):
-                content = ""
-                if up_laws:
-                    for f in up_laws: content += doc_tai_lieu(f) + "\n"
-                if url_law:
-                    content += doc_url(url_law) + "\n"
+            with c_file:
+                st.subheader("A. Tài liệu Nội bộ")
+                up_laws = st.file_uploader("Upload PDF/Docx (Chọn nhiều file)", type=["pdf", "docx", "txt"], accept_multiple_files=True)
+            
+            with c_web:
+                st.subheader("B. Dữ liệu Online")
+                # ĐỔI THÀNH TEXT AREA ĐỂ NHẬP NHIỀU DÒNG
+                url_input = st.text_area("Dán danh sách Link Web (Mỗi link 1 dòng):", height=150, placeholder="https://thuvienphapluat.vn/...\nhttps://vnexpress.net/...")
+            
+            # Nút Xử lý Trung tâm
+            if st.button("🚀 KÍCH HOẠT HỆ THỐNG ĐỌC", type="primary", use_container_width=True):
+                content_buffer = ""
                 
-                if content:
-                    st.session_state.legal_data = content
-                    st.success(f"Đã nạp {len(content)} ký tự.")
+                with st.status("🤖 Đang xử lý dữ liệu đa nguồn...") as status:
+                    # 1. Xử lý File
+                    if up_laws:
+                        for f in up_laws:
+                            st.write(f"📄 Đang đọc file: {f.name}...")
+                            content_buffer += f"\n\n=== NGUỒN FILE: {f.name} ===\n" + doc_tai_lieu(f)
+                    
+                    # 2. Xử lý Website (VÒNG LẶP CÀO DATA)
+                    if url_input:
+                        # Tách các link theo dòng
+                        list_urls = url_input.split('\n')
+                        for url in list_urls:
+                            url = url.strip()
+                            if url: # Nếu dòng không trống
+                                st.write(f"🌐 Đang cào dữ liệu từ: {url}...")
+                                web_text = doc_url(url)
+                                content_buffer += f"\n\n=== NGUỒN WEB: {url} ===\n" + web_text
+                    
+                    # 3. Kết thúc
+                    if content_buffer:
+                        st.session_state.legal_data = content_buffer
+                        status.update(label=f"✅ Đã nạp thành công tổng cộng {len(content_buffer):,} ký tự vào bộ nhớ!", state="complete")
+                    else:
+                        status.update(label="⚠️ Chưa có dữ liệu đầu vào.", state="error")
         
-        # 2. Chat
-        if 'legal_data' in st.session_state:
-            q = st.chat_input("Hỏi về luật...")
+        # 2. KHU VỰC HỎI ĐÁP (CHAT)
+        st.divider()
+        if 'legal_data' in st.session_state and st.session_state.legal_data:
+            st.info(f"🧠 Bộ nhớ hiện tại: {len(st.session_state.legal_data)} ký tự. Sẵn sàng trả lời.")
+            
+            q = st.chat_input("Hỏi gì đó (VD: Tổng hợp các thay đổi về thuế GTGT?)...")
             if q:
                 st.chat_message("user").write(q)
                 with st.chat_message("assistant"):
-                    with st.spinner("Tra cứu..."):
-                        ctx = st.session_state.legal_data[:30000]
-                        res = model.generate_content(f"Context: {ctx}. Q: {q}. Role: Legal Expert.")
+                    with st.spinner("Đang tổng hợp thông tin từ các nguồn..."):
+                        # RAG: Gửi dữ liệu đã cào được + Câu hỏi cho Gemini
+                        ctx = st.session_state.legal_data[:40000] # Giới hạn 40k ký tự an toàn
+                        prompt = f"""
+                        Bạn là Chuyên gia Pháp chế & Phân tích thông tin.
+                        
+                        DỮ LIỆU TỔNG HỢP TỪ CÁC NGUỒN (FILE + WEB):
+                        {ctx}
+                        
+                        CÂU HỎI: "{q}"
+                        
+                        YÊU CẦU:
+                        1. Trả lời chi tiết, có cấu trúc.
+                        2. TRÍCH DẪN NGUỒN: Khi đưa ra thông tin, hãy ghi rõ lấy từ file nào hoặc link nào.
+                        """
+                        res = model.generate_content(prompt)
                         st.markdown(res.text)
-
+        else:
+            st.info("👈 Hãy nạp tài liệu hoặc link web ở trên để bắt đầu Chat.")
+            
 # --- 6. MAIN ---
 def main():
     auth = AuthManager()
