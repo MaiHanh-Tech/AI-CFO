@@ -12,12 +12,12 @@ import requests
 import io
 
 # --- 1. CẤU HÌNH TRANG ---
-st.set_page_config(page_title="AI Financial Controller Ultimate", layout="wide", page_icon="💰")
+st.set_page_config(page_title="AI Financial Controller", layout="wide", page_icon="💰")
 
 # --- TỪ ĐIỂN ĐA NGÔN NGỮ ---
 TRANS = {
     "vi": {
-        "title": "💰 Hệ thống Giám đốc Tài chính AI (CFO Ultimate)",
+        "title": "💰 Hệ thống Giám đốc Tài chính AI (CFO)",
         "role_admin": "CFO (Giám đốc Tài chính)",
         "role_chief": "Kế toán trưởng",
         "role_staff": "Kế toán viên",
@@ -35,7 +35,7 @@ TRANS = {
         "logout": "Đăng xuất"
     },
     "en": {
-        "title": "💰 AI Financial Controller Ultimate",
+        "title": "💰 AI Financial Controller",
         "role_admin": "CFO",
         "role_chief": "Chief Accountant",
         "role_staff": "Staff",
