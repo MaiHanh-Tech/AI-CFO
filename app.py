@@ -13,7 +13,12 @@ import requests
 import io
 import time
 from google.api_core.exceptions import ResourceExhausted
-
+try:
+    from duckduckgo_search import DDGS
+    HAS_SEARCH = True
+except:
+    HAS_SEARCH = False
+    
 # --- 1. CẤU HÌNH TRANG ---
 st.set_page_config(page_title="AI CFO Controller", layout="wide", page_icon="💰")
 
@@ -434,79 +439,107 @@ def show_dashboard():
 
         else: st.warning("⛔ Chỉ dành cho CFO.")
 
-    # === TAB 5: PHÁP CHẾ (GIỮ NGUYÊN) ===
+   # === TAB 5: PHÁP CHẾ TỰ ĐỘNG (AUTO-LEGAL) ===
     with t5:
-        st.header("⚖️ Trung Tâm Pháp Chế & Nghiên Cứu Đa Nguồn")
+        st.header("⚖️ Trung Tâm Pháp Chế & Tra Cứu Tự Động")
+        st.info("💡 Mẹo cho CFO: Đừng nạp từng thông tư lẻ tẻ. Hãy tìm **'Văn bản hợp nhất' (VBHN)** để có nội dung đầy đủ và cập nhật nhất.")
         
-        with st.expander("📥 Nạp Kiến thức (Upload File & Link)", expanded=True):
-            c_file, c_web = st.columns(2)
-            
-            with c_file:
-                st.subheader("A. Tài liệu & Danh sách Link")
-                up_laws = st.file_uploader("Upload Tài liệu (PDF, Word, TXT, MD, HTML)", 
-                               type=["pdf", "docx", "txt", "md", "html", "htm"], 
-                               accept_multiple_files=True)
+        # CHIA LÀM 2 CỘT: TÌM TỰ ĐỘNG & NẠP THỦ CÔNG
+        col_auto, col_manual = st.columns([3, 2])
         
-                up_excel_links = st.file_uploader("Hoặc Upload Excel chứa Link", type=["xlsx"])
+        # --- PHẦN A: CỖ MÁY SĂN TÌM VĂN BẢN (AUTO-SEARCH) ---
+        with col_auto:
+            st.subheader("🔍 A. Trợ lý Săn Tìm Văn Bản (Khuyên dùng)")
             
-            with c_web:
-                st.subheader("B. Dán Link trực tiếp")
-                url_input = st.text_area("Dán Link Web (Mỗi link 1 dòng):", height=150)
-            
-            if st.button("🚀 KÍCH HOẠT HỆ THỐNG ĐỌC", type="primary", use_container_width=True):
-                content_buffer = ""
-                with st.status("🤖 Đang xử lý dữ liệu đa nguồn...") as status:
-                    if up_laws:
-                        for f in up_laws:
-                            st.write(f"📄 Đang đọc văn bản: {f.name}...")
-                            content_buffer += f"\n\n=== NGUỒN FILE: {f.name} ===\n" + doc_tai_lieu(f)
-                    
-                    list_urls = []
-                    if up_excel_links:
+            if not HAS_SEARCH:
+                st.error("⚠️ Chưa cài thư viện tìm kiếm. Vui lòng chạy: `pip install duckduckgo-search`")
+            else:
+                search_kw = st.text_input("Gõ tên luật cần tìm (VD: Văn bản hợp nhất thuế TNDN 2024):", placeholder="Nhập tên văn bản luật...")
+                
+                if st.button("🔎 TÌM & ĐỌC NGAY", type="primary"):
+                    if search_kw:
+                        status = st.status(f"🤖 Đang lùng sục khắp Internet về '{search_kw}'...")
                         try:
-                            df_links = pd.read_excel(up_excel_links)
-                            for col in df_links.columns:
-                                urls_in_col = df_links[col].astype(str).str.contains("http", na=False)
-                                if urls_in_col.any():
-                                    found_urls = df_links.loc[urls_in_col, col].tolist()
-                                    list_urls.extend(found_urls)
-                        except Exception as e: st.error(f"Lỗi đọc Excel link: {e}")
+                            # 1. Tìm kiếm trên mạng
+                            results = DDGS().text(search_kw + " site:thuvienphapluat.vn OR site:vanban.chinhphu.vn OR site:mof.gov.vn", max_results=5)
+                            
+                            found_text = ""
+                            status.write("✅ Đã tìm thấy các nguồn uy tín:")
+                            
+                            for res in results:
+                                title = res['title']
+                                link = res['href']
+                                body = res['body']
+                                status.write(f"- 🔗 Đang đọc: [{title}]({link})")
+                                
+                                # 2. Cào nội dung (Thử đọc nhanh)
+                                try:
+                                    # Lấy nội dung tóm tắt từ Search Engine (Nhanh nhất)
+                                    # Nếu muốn đọc full web thì dùng hàm doc_url(link) nhưng sẽ chậm hơn
+                                    full_content = doc_url(link) 
+                                    if len(full_content) < 500: # Nếu web chặn, lấy snippet
+                                        full_content = body 
+                                    
+                                    found_text += f"\n\n=== NGUỒN: {title} ({link}) ===\n{full_content}"
+                                except: pass
+                            
+                            # 3. Nạp vào bộ nhớ
+                            if found_text:
+                                if 'legal_data' not in st.session_state: st.session_state.legal_data = ""
+                                st.session_state.legal_data += found_text
+                                status.update(label=f"🎉 Đã nạp xong {len(found_text):,} ký tự mới vào bộ nhớ!", state="complete")
+                            else:
+                                status.update(label="❌ Không đọc được nội dung chi tiết. Thử lại từ khóa khác.", state="error")
+                                
+                        except Exception as e:
+                            status.update(label=f"⚠️ Lỗi tìm kiếm: {str(e)}", state="error")
 
-                    if url_input: list_urls.extend(url_input.split('\n'))
-                    list_urls = list(set([u.strip() for u in list_urls if u.strip()]))
-                    
-                    if list_urls:
-                        st.write(f"🌐 Bắt đầu quét {len(list_urls)} trang web...")
-                        progress_bar = st.progress(0)
-                        for i, url in enumerate(list_urls):
-                            try:
-                                web_text = doc_url(url)
-                                content_buffer += f"\n\n=== NGUỒN WEB: {url} ===\n" + web_text
-                            except: pass
-                            progress_bar.progress((i + 1) / len(list_urls))
-                    
-                    if content_buffer:
-                        st.session_state.legal_data = content_buffer
-                        status.update(label=f"✅ Đã nạp thành công {len(content_buffer):,} ký tự!", state="complete")
-                    else:
-                        status.update(label="⚠️ Chưa có dữ liệu đầu vào.", state="error")
-        
+        # --- PHẦN B: NẠP THỦ CÔNG (NHƯ CŨ) ---
+        with col_manual:
+            st.subheader("📂 B. Nạp File Có Sẵn")
+            with st.expander("Upload File / Excel Link"):
+                up_laws = st.file_uploader("Chọn file (PDF/Docx):", type=["pdf", "docx", "txt"], accept_multiple_files=True)
+                if st.button("📥 Nạp File"):
+                    if up_laws:
+                        txt = ""
+                        for f in up_laws: txt += f"\n=== FILE: {f.name} ===\n" + doc_tai_lieu(f)
+                        if 'legal_data' not in st.session_state: st.session_state.legal_data = ""
+                        st.session_state.legal_data += txt
+                        st.success(f"Đã nạp {len(txt)} ký tự.")
+
+        # --- PHẦN C: HỎI ĐÁP ---
         st.divider()
-        if 'legal_data' in st.session_state and st.session_state.legal_data:
-            data_len = len(st.session_state.legal_data)
-            st.info(f"🧠 Bộ nhớ hiện tại: {data_len:,} ký tự.")
-            
-            q = st.chat_input("Hỏi luật sư AI...")
+        
+        # Hiển thị trạng thái bộ nhớ
+        mem_len = len(st.session_state.get('legal_data', ''))
+        st.caption(f"🧠 Bộ nhớ Pháp chế hiện tại: **{mem_len:,}** ký tự. (Sẵn sàng trả lời)")
+        
+        if mem_len > 0:
+            q = st.chat_input("Hỏi về luật (VD: Chi phí lãi vay được trừ tối đa bao nhiêu?)...")
             if q:
                 st.chat_message("user").write(q)
                 with st.chat_message("assistant"):
-                    with st.spinner("Đang nghiên cứu hồ sơ..."):
-                        ctx = st.session_state.legal_data[:500000] 
-                        prompt = f"Bạn là Chuyên gia Pháp chế. Dựa vào dữ liệu: {ctx}\nCâu hỏi: '{q}'\nTrả lời chi tiết + Trích nguồn."
+                    with st.spinner("Đang tra cứu các văn bản đã nạp..."):
+                        # RAG Context
+                        ctx = st.session_state.legal_data[:500000]
+                        prompt = f"""
+                        Bạn là Trợ lý Pháp chế AI chuyên nghiệp (Legal Expert).
+                        
+                        DỮ LIỆU LUẬT ĐÃ CÓ (Từ Search/File):
+                        {ctx}
+                        
+                        CÂU HỎI CỦA CFO: "{q}"
+                        
+                        YÊU CẦU:
+                        1. Trả lời căn cứ vào dữ liệu trên.
+                        2. Nếu dữ liệu trên có nhiều văn bản (Cũ/Mới), hãy ưu tiên văn bản có ngày ban hành mới nhất.
+                        3. Trích dẫn rõ điều khoản (nếu có trong dữ liệu).
+                        4. Nếu không tìm thấy trong dữ liệu, hãy dùng kiến thức có sẵn của bạn nhưng cảnh báo "Theo kiến thức chung (chưa kiểm chứng qua văn bản nạp vào)..."
+                        """
                         res = run_gemini_safe(model.generate_content, prompt)
                         if res: st.markdown(res.text)
         else:
-            st.info("👈 Hãy nạp tài liệu để bắt đầu.")
+            st.warning("👈 Hãy nhập từ khóa vào ô Tìm kiếm (Bên trái) hoặc Upload file để bắt đầu.")
             
 # --- 6. MAIN ---
 def main():
