@@ -12,7 +12,7 @@ import requests
 import io
 
 # --- 1. CẤU HÌNH TRANG ---
-st.set_page_config(page_title="AI Financial Controller", layout="wide", page_icon="💰")
+st.set_page_config(page_title="AI CFO Controller", layout="wide", page_icon="💰")
 
 # --- TỪ ĐIỂN ĐA NGÔN NGỮ ---
 TRANS = {
@@ -35,7 +35,7 @@ TRANS = {
         "logout": "Đăng xuất"
     },
     "en": {
-        "title": "💰 AI Financial Controller",
+        "title": "💰 AI CFO Controller",
         "role_admin": "CFO",
         "role_chief": "Chief Accountant",
         "role_staff": "Staff",
