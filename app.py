@@ -188,13 +188,36 @@ def tinh_chi_so_tai_chinh(df):
     return df
 
 # --- 5. CÁC HÀM ĐỌC & ML ---
+# --- CẬP NHẬT HÀM ĐỌC WEB (Vượt tường lửa) ---
 def doc_url(url):
     try:
-        response = requests.get(url, timeout=10)
+        # Giả lập trình duyệt Chrome để không bị chặn
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        # Nếu web lỗi (404, 403), trả về rỗng để code chính xử lý
+        if response.status_code != 200:
+            return ""
+
         soup = BeautifulSoup(response.content, 'html.parser')
-        text = ' '.join([p.get_text() for p in soup.find_all(['p', 'h1', 'h2', 'h3', 'li'])])
-        return text[:20000]
-    except Exception as e: return f"Lỗi Web: {e}"
+        
+        # Xóa quảng cáo, menu rác
+        for script in soup(["script", "style", "nav", "footer", "header", "aside"]):
+            script.extract()
+            
+        # Lấy toàn bộ chữ trong các thẻ quan trọng
+        text = ' '.join([p.get_text() for p in soup.find_all(['p', 'h1', 'h2', 'h3', 'div', 'article'])])
+        
+        # Làm sạch khoảng trắng thừa
+        lines = (line.strip() for line in text.splitlines())
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        text = '\n'.join(chunk for chunk in chunks if chunk)
+        
+        return text[:30000] # Lấy tối đa 30.000 ký tự
+    except Exception:
+        return ""
 
 def doc_tai_lieu(uploaded_file):
     try:
@@ -439,107 +462,118 @@ def show_dashboard():
 
         else: st.warning("⛔ Chỉ dành cho CFO.")
 
-   # === TAB 5: PHÁP CHẾ TỰ ĐỘNG (AUTO-LEGAL) ===
+   # === TAB 5: PHÁP CHẾ (BẢN SỬA LỖI & KHÔI PHỤC) ===
     with t5:
-        st.header("⚖️ Trung Tâm Pháp Chế & Tra Cứu Tự Động")
-        st.info("💡 Mẹo cho CFO: Đừng nạp từng thông tư lẻ tẻ. Hãy tìm **'Văn bản hợp nhất' (VBHN)** để có nội dung đầy đủ và cập nhật nhất.")
+        st.header("⚖️ Trung Tâm Pháp Chế & Tra Cứu")
         
-        # CHIA LÀM 2 CỘT: TÌM TỰ ĐỘNG & NẠP THỦ CÔNG
-        col_auto, col_manual = st.columns([3, 2])
+        # Chia cột: Bên trái Tìm kiếm - Bên phải Nạp thủ công
+        col_auto, col_manual = st.columns([1, 1])
         
-        # --- PHẦN A: CỖ MÁY SĂN TÌM VĂN BẢN (AUTO-SEARCH) ---
+        # --- CỘT TRÁI: TÌM KIẾM TỰ ĐỘNG ---
         with col_auto:
-            st.subheader("🔍 A. Trợ lý Săn Tìm Văn Bản (Khuyên dùng)")
-            
+            st.subheader("🔍 A. Tìm & Đọc Tự Động")
             if not HAS_SEARCH:
-                st.error("⚠️ Chưa cài thư viện tìm kiếm. Vui lòng chạy: `pip install duckduckgo-search`")
+                st.error("⚠️ Chưa cài `duckduckgo-search`")
             else:
-                search_kw = st.text_input("Gõ tên luật cần tìm (VD: Văn bản hợp nhất thuế TNDN 2024):", placeholder="Nhập tên văn bản luật...")
+                search_kw = st.text_input("Nhập từ khóa luật (VD: Thuế TNCN 2024):", key="search_input")
                 
-                if st.button("🔎 TÌM & ĐỌC NGAY", type="primary"):
+                if st.button("🔎 TÌM KIẾM & ĐỌC WEB", type="primary"):
                     if search_kw:
-                        status = st.status(f"🤖 Đang lùng sục khắp Internet về '{search_kw}'...")
+                        status = st.status(f"🤖 Đang tìm kiếm '{search_kw}'...")
                         try:
-                            # 1. Tìm kiếm trên mạng
-                            results = DDGS().text(search_kw + " site:thuvienphapluat.vn OR site:vanban.chinhphu.vn OR site:mof.gov.vn", max_results=5)
+                            # 1. Tìm kiếm
+                            results = DDGS().text(search_kw, region='vn-vn', max_results=5)
                             
                             found_text = ""
-                            status.write("✅ Đã tìm thấy các nguồn uy tín:")
+                            count_ok = 0
                             
                             for res in results:
                                 title = res['title']
                                 link = res['href']
-                                body = res['body']
-                                status.write(f"- 🔗 Đang đọc: [{title}]({link})")
+                                snippet = res['body']
                                 
-                                # 2. Cào nội dung (Thử đọc nhanh)
-                                try:
-                                    # Lấy nội dung tóm tắt từ Search Engine (Nhanh nhất)
-                                    # Nếu muốn đọc full web thì dùng hàm doc_url(link) nhưng sẽ chậm hơn
-                                    full_content = doc_url(link) 
-                                    if len(full_content) < 500: # Nếu web chặn, lấy snippet
-                                        full_content = body 
-                                    
-                                    found_text += f"\n\n=== NGUỒN: {title} ({link}) ===\n{full_content}"
-                                except: pass
+                                status.write(f"🔗 Thử đọc: {title}...")
+                                
+                                # 2. Thử đọc nội dung sâu bên trong
+                                deep_content = doc_url(link)
+                                
+                                if len(deep_content) > 500:
+                                    # Nếu đọc được nội dung dài > 500 ký tự -> Tốt
+                                    found_text += f"\n\n=== NGUỒN (Full): {title} ===\nLink: {link}\nNội dung: {deep_content}"
+                                    count_ok += 1
+                                else:
+                                    # Nếu bị chặn không đọc được -> Dùng tạm đoạn tóm tắt (Snippet)
+                                    found_text += f"\n\n=== NGUỒN (Tóm tắt): {title} ===\nLink: {link}\nNội dung: {snippet}..."
                             
                             # 3. Nạp vào bộ nhớ
                             if found_text:
                                 if 'legal_data' not in st.session_state: st.session_state.legal_data = ""
                                 st.session_state.legal_data += found_text
-                                status.update(label=f"🎉 Đã nạp xong {len(found_text):,} ký tự mới vào bộ nhớ!", state="complete")
+                                status.update(label=f"✅ Đã nạp dữ liệu từ {len(results)} trang web (Đọc sâu được {count_ok} trang)!", state="complete")
                             else:
-                                status.update(label="❌ Không đọc được nội dung chi tiết. Thử lại từ khóa khác.", state="error")
+                                status.update(label="❌ Không tìm thấy kết quả nào.", state="error")
                                 
                         except Exception as e:
-                            status.update(label=f"⚠️ Lỗi tìm kiếm: {str(e)}", state="error")
+                            status.update(label=f"⚠️ Lỗi kết nối: {str(e)}", state="error")
 
-        # --- PHẦN B: NẠP THỦ CÔNG (NHƯ CŨ) ---
+        # --- CỘT PHẢI: NẠP THỦ CÔNG (ĐÃ KHÔI PHỤC) ---
         with col_manual:
-            st.subheader("📂 B. Nạp File Có Sẵn")
-            with st.expander("Upload File / Excel Link"):
-                up_laws = st.file_uploader("Chọn file (PDF/Docx):", type=["pdf", "docx", "txt"], accept_multiple_files=True)
-                if st.button("📥 Nạp File"):
+            st.subheader("📂 B. Nạp File & Link Thủ Công")
+            
+            with st.expander("Mở bảng nạp dữ liệu", expanded=True):
+                # 1. Upload File
+                up_laws = st.file_uploader("1. Chọn File (PDF/Docx/Txt):", type=["pdf", "docx", "txt"], accept_multiple_files=True)
+                
+                # 2. Dán Link (ĐÃ KHÔI PHỤC)
+                manual_links = st.text_area("2. Hoặc Dán Link Web (Mỗi link 1 dòng):", height=100, placeholder="https://thuvienphapluat.vn/...")
+                
+                # Nút xử lý chung cho cột phải
+                if st.button("📥 NẠP DỮ LIỆU THỦ CÔNG"):
+                    manual_text = ""
+                    
+                    # Xử lý File
                     if up_laws:
-                        txt = ""
-                        for f in up_laws: txt += f"\n=== FILE: {f.name} ===\n" + doc_tai_lieu(f)
-                        if 'legal_data' not in st.session_state: st.session_state.legal_data = ""
-                        st.session_state.legal_data += txt
-                        st.success(f"Đã nạp {len(txt)} ký tự.")
+                        for f in up_laws:
+                            manual_text += f"\n=== FILE: {f.name} ===\n" + doc_tai_lieu(f)
+                    
+                    # Xử lý Link
+                    if manual_links:
+                        links = manual_links.split('\n')
+                        status_manual = st.status("Đang đọc link thủ công...")
+                        for lnk in links:
+                            if lnk.strip():
+                                status_manual.write(f"Đang đọc: {lnk}...")
+                                content = doc_url(lnk.strip())
+                                if content:
+                                    manual_text += f"\n=== WEB THỦ CÔNG: {lnk} ===\n{content}"
+                                else:
+                                    status_manual.warning(f"Không đọc được: {lnk}")
+                        status_manual.update(label="Xong!", state="complete")
 
-        # --- PHẦN C: HỎI ĐÁP ---
+                    if manual_text:
+                        if 'legal_data' not in st.session_state: st.session_state.legal_data = ""
+                        st.session_state.legal_data += manual_text
+                        st.success(f"✅ Đã nạp thêm {len(manual_text):,} ký tự vào bộ nhớ.")
+                    else:
+                        st.warning("Chưa có dữ liệu để nạp.")
+
+        # --- PHẦN HỎI ĐÁP ---
         st.divider()
-        
-        # Hiển thị trạng thái bộ nhớ
         mem_len = len(st.session_state.get('legal_data', ''))
-        st.caption(f"🧠 Bộ nhớ Pháp chế hiện tại: **{mem_len:,}** ký tự. (Sẵn sàng trả lời)")
+        st.caption(f"🧠 Bộ nhớ hiện tại: **{mem_len:,}** ký tự.")
         
-        if mem_len > 0:
-            q = st.chat_input("Hỏi về luật (VD: Chi phí lãi vay được trừ tối đa bao nhiêu?)...")
-            if q:
-                st.chat_message("user").write(q)
-                with st.chat_message("assistant"):
-                    with st.spinner("Đang tra cứu các văn bản đã nạp..."):
-                        # RAG Context
+        q = st.chat_input("Hỏi luật sư AI...")
+        if q:
+            st.chat_message("user").write(q)
+            with st.chat_message("assistant"):
+                if mem_len == 0:
+                    st.warning("⚠️ Bộ nhớ trống. Vui lòng Tìm kiếm hoặc Nạp file trước.")
+                else:
+                    with st.spinner("Đang tra cứu..."):
                         ctx = st.session_state.legal_data[:500000]
-                        prompt = f"""
-                        Bạn là Trợ lý Pháp chế AI chuyên nghiệp (Legal Expert).
-                        
-                        DỮ LIỆU LUẬT ĐÃ CÓ (Từ Search/File):
-                        {ctx}
-                        
-                        CÂU HỎI CỦA CFO: "{q}"
-                        
-                        YÊU CẦU:
-                        1. Trả lời căn cứ vào dữ liệu trên.
-                        2. Nếu dữ liệu trên có nhiều văn bản (Cũ/Mới), hãy ưu tiên văn bản có ngày ban hành mới nhất.
-                        3. Trích dẫn rõ điều khoản (nếu có trong dữ liệu).
-                        4. Nếu không tìm thấy trong dữ liệu, hãy dùng kiến thức có sẵn của bạn nhưng cảnh báo "Theo kiến thức chung (chưa kiểm chứng qua văn bản nạp vào)..."
-                        """
+                        prompt = f"Dựa vào dữ liệu: {ctx}\nCâu hỏi: '{q}'\nTrả lời chi tiết + Trích nguồn."
                         res = run_gemini_safe(model.generate_content, prompt)
                         if res: st.markdown(res.text)
-        else:
-            st.warning("👈 Hãy nhập từ khóa vào ô Tìm kiếm (Bên trái) hoặc Upload file để bắt đầu.")
             
 # --- 6. MAIN ---
 def main():
