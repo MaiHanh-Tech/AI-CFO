@@ -170,11 +170,22 @@ def doc_url(url):
 
 def doc_tai_lieu(uploaded_file):
     try:
+        # Lấy đuôi file (pdf, docx, html...)
         ext = uploaded_file.name.split('.')[-1].lower()
-        if ext == 'pdf': return "\n".join([p.extract_text() for p in PdfReader(uploaded_file).pages])
-        elif ext == 'docx': return "\n".join([p.text for p in Document(uploaded_file).paragraphs])
-        elif ext in ['txt', 'md']: return str(uploaded_file.read(), "utf-8")
-    except: return ""
+        
+        if ext == 'pdf': 
+            return "\n".join([p.extract_text() for p in PdfReader(uploaded_file).pages])
+        elif ext == 'docx': 
+            return "\n".join([p.text for p in Document(uploaded_file).paragraphs])
+        elif ext in ['txt', 'md']: 
+            # Đọc file Text hoặc Markdown
+            return str(uploaded_file.read(), "utf-8")
+        elif ext in ['html', 'htm']: 
+            # Đọc file Web (HTML) -> Chỉ lấy chữ, bỏ thẻ code
+            soup = BeautifulSoup(uploaded_file, "html.parser")
+            return soup.get_text()
+            
+    except Exception as e: return f"Lỗi đọc file: {e}"
     return ""
 
 def phat_hien_gian_lan_ml(df):
@@ -302,80 +313,108 @@ def show_dashboard():
                     st.plotly_chart(fig, use_container_width=True)
         else: st.warning("⛔ Chỉ dành cho CFO.")
 
-    # === TAB 5: PHÁP CHẾ & NGHIÊN CỨU (ĐÃ NÂNG CẤP ĐỌC NHIỀU LINK) ===
+    # === TAB 5: PHÁP CHẾ & NGHIÊN CỨU (ĐÃ NÂNG CẤP) ===
     with t5:
         st.header("⚖️ Trung Tâm Pháp Chế & Nghiên Cứu Đa Nguồn")
         
-        # 1. KHU VỰC NẠP DỮ LIỆU
-        with st.expander("📥 Nạp Kiến thức (Upload File & Paste Links)", expanded=True):
+        with st.expander("📥 Nạp Kiến thức (Upload File & Link)", expanded=True):
             c_file, c_web = st.columns(2)
             
             with c_file:
-                st.subheader("A. Tài liệu Nội bộ")
-                up_laws = st.file_uploader("Upload PDF/Docx (Chọn nhiều file)", type=["pdf", "docx", "txt"], accept_multiple_files=True)
+                st.subheader("A. Tài liệu & Danh sách Link")
+                # Tìm dòng này trong Tab 5 và sửa lại danh sách type:
+                up_laws = st.file_uploader("Upload Tài liệu (PDF, Word, TXT, MD, HTML)", 
+                               type=["pdf", "docx", "txt", "md", "html", "htm"], 
+                               accept_multiple_files=True)
+        
+                # THÊM: Upload file Excel chứa link
+                up_excel_links = st.file_uploader("Hoặc Upload Excel chứa Link", type=["xlsx"])
             
             with c_web:
-                st.subheader("B. Dữ liệu Online")
-                # ĐỔI THÀNH TEXT AREA ĐỂ NHẬP NHIỀU DÒNG
-                url_input = st.text_area("Dán danh sách Link Web (Mỗi link 1 dòng):", height=150, placeholder="https://thuvienphapluat.vn/...\nhttps://vnexpress.net/...")
+                st.subheader("B. Dán Link trực tiếp")
+                url_input = st.text_area("Dán Link Web (Mỗi link 1 dòng):", height=150)
             
-            # Nút Xử lý Trung tâm
+            # Nút Xử lý
             if st.button("🚀 KÍCH HOẠT HỆ THỐNG ĐỌC", type="primary", use_container_width=True):
                 content_buffer = ""
                 
                 with st.status("🤖 Đang xử lý dữ liệu đa nguồn...") as status:
-                    # 1. Xử lý File
+                    # 1. Xử lý File Tài liệu
                     if up_laws:
                         for f in up_laws:
-                            st.write(f"📄 Đang đọc file: {f.name}...")
+                            st.write(f"📄 Đang đọc văn bản: {f.name}...")
                             content_buffer += f"\n\n=== NGUỒN FILE: {f.name} ===\n" + doc_tai_lieu(f)
                     
-                    # 2. Xử lý Website (VÒNG LẶP CÀO DATA)
+                    # 2. Xử lý File Excel chứa Link (TÍNH NĂNG MỚI)
+                    list_urls = []
+                    if up_excel_links:
+                        try:
+                            df_links = pd.read_excel(up_excel_links)
+                            # Tự động tìm cột nào có chứa chữ "http"
+                            for col in df_links.columns:
+                                urls_in_col = df_links[col].astype(str).str.contains("http", na=False)
+                                if urls_in_col.any():
+                                    found_urls = df_links.loc[urls_in_col, col].tolist()
+                                    list_urls.extend(found_urls)
+                                    st.write(f"📑 Đã tìm thấy {len(found_urls)} link trong file Excel.")
+                        except Exception as e: st.error(f"Lỗi đọc Excel link: {e}")
+
+                    # 3. Xử lý Link dán tay
                     if url_input:
-                        # Tách các link theo dòng
-                        list_urls = url_input.split('\n')
-                        for url in list_urls:
-                            url = url.strip()
-                            if url: # Nếu dòng không trống
-                                st.write(f"🌐 Đang cào dữ liệu từ: {url}...")
+                        list_urls.extend(url_input.split('\n'))
+
+                    # 4. Tiến hành Cào dữ liệu từ tất cả Link
+                    # Loại bỏ link trùng & trống
+                    list_urls = list(set([u.strip() for u in list_urls if u.strip()]))
+                    
+                    if list_urls:
+                        st.write(f"🌐 Bắt đầu quét {len(list_urls)} trang web...")
+                        progress_bar = st.progress(0)
+                        for i, url in enumerate(list_urls):
+                            try:
                                 web_text = doc_url(url)
                                 content_buffer += f"\n\n=== NGUỒN WEB: {url} ===\n" + web_text
+                            except: pass
+                            progress_bar.progress((i + 1) / len(list_urls))
                     
-                    # 3. Kết thúc
+                    # 5. Kết thúc
                     if content_buffer:
                         st.session_state.legal_data = content_buffer
-                        status.update(label=f"✅ Đã nạp thành công tổng cộng {len(content_buffer):,} ký tự vào bộ nhớ!", state="complete")
+                        status.update(label=f"✅ Đã nạp thành công {len(content_buffer):,} ký tự!", state="complete")
                     else:
                         status.update(label="⚠️ Chưa có dữ liệu đầu vào.", state="error")
         
-        # 2. KHU VỰC HỎI ĐÁP (CHAT)
+        # 2. KHU VỰC HỎI ĐÁP
         st.divider()
         if 'legal_data' in st.session_state and st.session_state.legal_data:
-            st.info(f"🧠 Bộ nhớ hiện tại: {len(st.session_state.legal_data)} ký tự. Sẵn sàng trả lời.")
+            # Hiển thị độ lớn dữ liệu
+            data_len = len(st.session_state.legal_data)
+            st.info(f"🧠 Bộ nhớ hiện tại: {data_len:,} ký tự. (Gemini 2.5 xử lý tốt!)")
             
-            q = st.chat_input("Hỏi gì đó (VD: Tổng hợp các thay đổi về thuế GTGT?)...")
+            q = st.chat_input("Hỏi luật sư AI...")
             if q:
                 st.chat_message("user").write(q)
                 with st.chat_message("assistant"):
-                    with st.spinner("Đang tổng hợp thông tin từ các nguồn..."):
-                        # RAG: Gửi dữ liệu đã cào được + Câu hỏi cho Gemini
-                        ctx = st.session_state.legal_data[:40000] # Giới hạn 40k ký tự an toàn
+                    with st.spinner("Đang nghiên cứu hồ sơ..."):
+                        # --- CẬP NHẬT: TĂNG GIỚI HẠN TỪ 40.000 -> 500.000 ---
+                        # Gemini 1.5 Flash/Pro chịu được tới 1 triệu token (~4 triệu ký tự)
+                        # Em để 500k là rất an toàn và thoải mái cho chị nạp chục cuốn sách.
+                        ctx = st.session_state.legal_data[:500000] 
+                        
                         prompt = f"""
                         Bạn là Chuyên gia Pháp chế & Phân tích thông tin.
-                        
-                        DỮ LIỆU TỔNG HỢP TỪ CÁC NGUỒN (FILE + WEB):
+                        Dựa vào dữ liệu sau (được trích xuất từ file và link web):
                         {ctx}
                         
-                        CÂU HỎI: "{q}"
+                        Câu hỏi: "{q}"
                         
-                        YÊU CẦU:
-                        1. Trả lời chi tiết, có cấu trúc.
-                        2. TRÍCH DẪN NGUỒN: Khi đưa ra thông tin, hãy ghi rõ lấy từ file nào hoặc link nào.
+                        Yêu cầu: Trả lời chi tiết, chính xác và TRÍCH DẪN NGUỒN (Link nào hoặc File nào).
                         """
-                        res = model.generate_content(prompt)
-                        st.markdown(res.text)
+                        # Dùng hàm safe để tránh lỗi quota nếu đọc nhiều
+                        res = run_gemini_safe(model.generate_content, prompt)
+                        if res: st.markdown(res.text)
         else:
-            st.info("👈 Hãy nạp tài liệu hoặc link web ở trên để bắt đầu Chat.")
+            st.info("👈 Hãy nạp tài liệu để bắt đầu.")
             
 # --- 6. MAIN ---
 def main():
