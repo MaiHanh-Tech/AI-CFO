@@ -10,3 +10,4 @@ python-docx
 statsmodels 
 beautifulsoup4
 requests 
+duckduckgo-search
